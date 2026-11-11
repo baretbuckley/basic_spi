@@ -1,0 +1,42 @@
+
+
+Transmitter fsm logic sudo code
+
+input send_packet;
+output dout;
+output done;
+
+reset rst_n;
+clock clk;
+
+using state: State = Idle
+
+const data_size: int = 8;
+let bit_idx: reg = 0;
+
+assign dout = !rst_n & send_packet[bit_idx];
+assign done = state == idle || state == end_packet;
+
+when rst_n low:
+    state = idle;
+    bit_idx = 0;
+
+idle:
+    on posedge clk: state <= next_bit;
+
+next_bit:
+    on negedge clk:
+        bit_idx <= bit_idx += 1;
+        state <= send_data
+
+end_packet:
+    on negedge clk:
+        bit_idx <= 0;
+        state <= idle;
+
+send_data:
+    on posedge clk: 
+        if (bit_idx == data_size):
+            state <= end_packet
+        else:
+            state <= next_bit;

@@ -3,52 +3,54 @@
 
 
 module transmitter #(
-    parameter DATA_WIDTH = 8,
-    parameter MSB_FIRST = 1
+    parameter int DATA_WIDTH = 8,
+    parameter bool MSB_FIRST = 1,
+    parameter bool POS_EDGE = 1
 )(
     input wire clk,
     input wire rst_n,
-    input wire start,
-    input wire [DATA_WIDTH-1:0] data_in,
+    input wire [DATA_WIDTH-1:0] data_in, // Input data to transmit. Not copied to internal reg, must remain stable while done is low
     output wire data_out,
     output reg done
 );
 
+    typedef enum logic[1:0] {
+        Idle,
+        NextBit,
+        EndPacket,
+        SendData
+    } State;
 
-    // bit count also used to track if transmitting is complete
-    reg [$clog2(DATA_WIDTH):0] bit_count = DATA_WIDTH;
+    State state = Idle;
+    reg [$clog2(DATA_WIDTH):0] bit_idx = 0;
 
-    always @(posedge clk or negedge rst_n) begin
+    assign data_out = ~rst_n & data_in[bit_idx];
+    assign done = (state == Idle) || (state == EndPacket);
+
+    always @(posedge clk or negedge clk or rst_n) begin
         if (!rst_n) begin
-            done <= 0;
-        end else begin
-            done <= (bit_count == DATA_WIDTH)? 1 : 0;
-        end
+            state <= Idle;
+            bit_idx <= 0;
+        end else case(state)
+            Idle:
+                if (clk == POS_EDGE) 
+                    state <= (DATA_WIDTH==1)? EndPacket:NextBit;
+            NextBit:
+                if (clk != POS_EDGE) begin
+                    state <= send_data;
+                    bit_idx <= bit_idx + 1;
+                end
+            EndPacket:
+                if (clk != POS_EDGE) begin
+                    state <= send_data;
+                    bit_idx <= 0;
+                end
+            SendData:
+                if (clk == POS_EDGE) begin
+                    state <= (bit_idx == DATA_WIDTH-1)? EndPacket : NextBit;
+                end
+            default: begin end
+        endcase
     end
-
-    neg_edge_shift_reg #(.DATA_WIDTH(DATA_WIDTH), .MSB(MSB_FIRST)) sreg (
-        .clk(clk),
-        .rst_n(rst_n),
-        .init_data(data_in),
-        .write_en(start),
-        .next(data_out)
-    );
-
-
-    always @(negedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            bit_count <= DATA_WIDTH;
-        end
-        else if (bit_count == DATA_WIDTH) begin
-            if (start) bit_count <= 0;
-        end else begin
-            bit_count <= bit_count + 1;
-        end
-    end
-
-
-
-
-
 
 endmodule
