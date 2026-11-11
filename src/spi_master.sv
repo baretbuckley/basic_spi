@@ -3,7 +3,7 @@
 module spi_master #(
     parameter DATA_WIDTH = 8,
     parameter CLK_DIV = 25,
-    parameter MOSI_MSB_FIRST = 1,
+    parameter MOSI_MSB_FIRST = 1
 )(
     input wire clk,
     input wire rst_n,
